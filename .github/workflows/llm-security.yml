@@ -34,6 +34,11 @@ jobs:
     env:
       LITELLM_MASTER_KEY: sk-ci-${{ github.run_id }} # chave efêmera, vale só para este job
     steps:
+      - name: Libera espaço em disco (SDKs pré-instalados que o job não usa)
+        run: |
+          # imagem do Ollama + 2,6 GB de modelos + PyTorch do garak não cabem no disco padrão do runner
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -78,7 +83,7 @@ jobs:
           REST_API_KEY: demo-key-redteam
         run: |
           uv venv .venv-garak --python 3.12
-          uv pip install --python .venv-garak/bin/python "garak==${GARAK_VERSION}" --torch-backend cpu
+          uv pip install --no-cache --python .venv-garak/bin/python "garak==${GARAK_VERSION}" --torch-backend cpu
           .venv-garak/bin/garak --target_type rest -G security-tests/garak/gateway.json \
             --config security-tests/garak/garak.yaml --report_prefix gateway
           report="$(find "$HOME/.local/share/garak" -name 'gateway*.report.jsonl' | head -n 1)"
