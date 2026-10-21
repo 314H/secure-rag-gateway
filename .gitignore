@@ -1,0 +1,13 @@
+.venv/
+.venv-*/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+data/qdrant/
+logs/
+reports/
+requirements-audit.txt
+node_modules/
+.langfuse/

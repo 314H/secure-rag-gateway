@@ -1,0 +1,98 @@
+name: llm-security
+
+# Red teaming do gateway com modelos reais em CPU: Ollama (qwen2.5 0.5B, Llama Guard 3 1B, EmbeddingGemma),
+# LiteLLM Proxy, promptfoo (regressão de segurança) e garak (varredura de vulnerabilidades com limiar de ASR).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # toda segunda, 06:00 UTC: modelo e ataques mudam mesmo sem commit
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llm-security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OLLAMA_IMAGE: ollama/ollama:0.40.7
+  OLLAMA_MODELS_TO_PULL: qwen2.5:0.5b llama-guard3:1b embeddinggemma
+  CHAT_MODEL: ollama_chat/qwen2.5:0.5b
+  LITELLM_VERSION: 1.106.2
+  GARAK_VERSION: 0.17.1
+  PROMPTFOO_VERSION: 0.124.1
+  MAX_ATTACK_SUCCESS_RATE: "0.10"
+
+jobs:
+  redteam:
+    name: promptfoo + garak contra o gateway
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      LITELLM_MASTER_KEY: sk-ci-${{ github.run_id }} # chave efêmera, vale só para este job
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Cache dos modelos do Ollama
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ollama/models
+          key: ollama-models-v1-qwen2.5-0.5b-llamaguard3-1b-embeddinggemma
+
+      - name: Ollama em contêiner e modelos
+        run: |
+          mkdir -p ~/.ollama
+          docker run -d --name ollama -p 11434:11434 -v "$HOME/.ollama:/root/.ollama" "$OLLAMA_IMAGE"
+          curl -sf --retry 60 --retry-delay 2 --retry-connrefused --retry-all-errors http://127.0.0.1:11434/api/version
+          for model in $OLLAMA_MODELS_TO_PULL; do docker exec ollama ollama pull "$model"; done
+          sudo chown -R "$(id -u):$(id -g)" ~/.ollama  # o cache do Actions precisa ler os arquivos criados como root
+
+      - run: uv sync --locked --python 3.12
+
+      - name: Sobe LiteLLM e gateway
+        run: bash scripts/start_stack.sh
+
+      - name: promptfoo (regressão de segurança OWASP LLM Top 10)
+        env:
+          PROMPTFOO_DISABLE_TELEMETRY: "1"
+          PROMPTFOO_DISABLE_UPDATE: "1"
+        run: |
+          mkdir -p reports
+          npx -y "promptfoo@${PROMPTFOO_VERSION}" eval -c security-tests/promptfoo/promptfooconfig.yaml \
+            --no-cache --max-concurrency 2 -o reports/promptfoo-results.json -o reports/promptfoo-report.html
+
+      - name: garak (varredura com limiar de taxa de sucesso de ataque)
+        if: success() || failure()
+        env:
+          REST_API_KEY: demo-key-redteam
+        run: |
+          uv venv .venv-garak --python 3.12
+          uv pip install --python .venv-garak/bin/python "garak==${GARAK_VERSION}" --torch-backend cpu
+          .venv-garak/bin/garak --target_type rest -G security-tests/garak/gateway.json \
+            --config security-tests/garak/garak.yaml --report_prefix gateway
+          report="$(find "$HOME/.local/share/garak" -name 'gateway*.report.jsonl' | head -n 1)"
+          cp "$report" reports/garak-gateway.report.jsonl
+          cp "${report%.report.jsonl}.report.html" reports/garak-gateway.report.html || true
+          uv run python security-tests/garak/check_report.py reports/garak-gateway.report.jsonl \
+            --max-asr "$MAX_ATTACK_SUCCESS_RATE"
+
+      - name: Relatórios e trilha de auditoria
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: llm-security-reports
+          path: |
+            reports/
+            logs/
+          retention-days: 30

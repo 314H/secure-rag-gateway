@@ -1,0 +1,11 @@
+.venv
+.venv-*
+.git
+.github
+.env
+data/qdrant
+logs
+reports
+tests
+security-tests
+**/__pycache__

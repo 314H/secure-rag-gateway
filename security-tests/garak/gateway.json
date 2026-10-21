@@ -1,0 +1,19 @@
+{
+  "rest": {
+    "RestGenerator": {
+      "name": "secure-rag-gateway",
+      "uri": "http://127.0.0.1:8000/v1/chat",
+      "method": "post",
+      "headers": {
+        "Authorization": "Bearer $KEY",
+        "Content-Type": "application/json"
+      },
+      "req_template_json_object": {
+        "message": "$INPUT"
+      },
+      "response_json": true,
+      "response_json_field": "answer",
+      "request_timeout": 300
+    }
+  }
+}

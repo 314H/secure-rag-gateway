@@ -1,0 +1,32 @@
+# Política de segurança do gateway. Cada bloco mapeia para um risco do OWASP Top 10 for LLM 2026.
+limits:                      # LLM06 Unbounded Consumption
+  max_input_chars: 4000
+  requests_per_minute: 30
+  max_output_tokens: 400
+
+injection:                   # LLM01 Prompt Injection (heurística local, antes de chamar qualquer modelo)
+  block_threshold: 3         # soma dos pesos das regras disparadas
+  scan_retrieved_chunks: true
+
+safety:                      # Llama Guard 3 (entrada e saída)
+  # S6 (specialized advice) fica fora: bloquearia dúvidas financeiras legítimas de um assistente bancário.
+  block_categories: [S1, S2, S3, S4, S5, S7, S9, S10, S11, S12, S14]
+
+pii:                         # LLM02 Sensitive Information Disclosure
+  language: pt
+  min_score: 0.5
+  entities: [BR_CPF, BR_CNPJ, CREDIT_CARD, EMAIL_ADDRESS, BR_PHONE, PIX_EVP, PERSON]
+  # na saída só identificadores estruturados: o NER de nomes gera falso positivo em texto do próprio modelo
+  output_entities: [BR_CPF, BR_CNPJ, CREDIT_CARD, EMAIL_ADDRESS, BR_PHONE, PIX_EVP]
+  # Quais entidades pseudonimizadas cada grupo pode ver de volta na resposta. O resto sai mascarado.
+  reidentify:
+    atendimento: [PERSON]
+    fraude: [PERSON, BR_CPF, BR_CNPJ]
+
+output:                      # LLM10 Improper Output Handling / LLM08 Hidden Context Exposure
+  allowed_link_domains: [bancoexemplo.com.br]
+
+rag:                         # LLM09 Vector and Embedding Weaknesses
+  top_k: 4
+  min_score: 0.40           # calibrado com EmbeddingGemma: relevantes 0,56-0,72; sem relação <= 0,23
+  require_context: true      # sem documento autorizado relevante, não chama o LLM

@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Lint e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --python 3.12
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+
+  security:
+    name: Segredos, SAST, SCA e IaC
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Gitleaks (segredos em todo o histórico)
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Bandit (SAST Python)
+        run: uvx bandit==1.9.4 -r src -ll
+      - name: Semgrep (SAST)
+        run: uvx semgrep==1.182.0 scan --config p/python --config p/secrets --error --metrics off src
+      - name: pip-audit (SCA das dependências travadas no uv.lock)
+        run: |
+          uv export --no-hashes --no-emit-project --format requirements-txt | grep -v "pt-core-news-md" > requirements-audit.txt
+          uvx pip-audit==2.10.1 -r requirements-audit.txt --no-deps --strict
+      - name: Checkov (Dockerfile, docker compose e workflows)
+        run: uvx checkov==3.3.30 -d . --framework dockerfile github_actions --quiet --compact

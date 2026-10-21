@@ -1,0 +1,17 @@
+# Usuários de demonstração. Só o hash SHA-256 da API key fica aqui; as chaves de demo estão no README.
+# Em produção: identidade via OIDC/JWT (Entra ID, Keycloak) e grupos vindos do IdP.
+principals:
+  - id: ana.atendimento
+    groups: [publico, atendimento]
+    key_sha256: 080508c8adcee93506d1832dd604113f8722493525a7b164c87fa26591c9a141  # demo-key-atendimento
+  - id: bruno.fraude
+    groups: [publico, atendimento, fraude]
+    key_sha256: 28de364f4d0670881e9efd6f581225025a15346ebfcc6048ea47952ba0c966a3  # demo-key-fraude
+  - id: carla.ti
+    groups: [publico, ti]
+    key_sha256: 1f9fbdbddaf07db1332755802dad90a93647c9d0fbe7213306772c422c8f91cd  # demo-key-ti
+  # conta de serviço do red teaming no CI: mesmos acessos do atendimento, cota maior
+  - id: redteam.ci
+    groups: [publico, atendimento]
+    requests_per_minute: 600
+    key_sha256: e7ab90898c8cf5193547c1209bf0cee2720ab8fceb53032600f9d64cb35582c2  # demo-key-redteam

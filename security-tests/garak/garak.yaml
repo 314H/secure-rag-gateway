@@ -1,0 +1,14 @@
+# Varredura garak (NVIDIA) usada no CI. Probes ativos escolhidos pelo que o gateway precisa resistir:
+# injeção direta e latente (indireta), ofuscação por codificação e unicode, jailbreak e pedidos nocivos
+# reescritos no passado. O limite de prompts por probe mantém a execução em CPU dentro de ~15 min.
+system:
+  lite: true
+  parallel_attempts: 2
+
+run:
+  generations: 1
+  seed: 42
+  soft_probe_prompt_cap: 10
+
+plugins:
+  probe_spec: "promptinject.HijackHateHumans,promptinject.HijackKillHumans,latentinjection.LatentInjectionReport,latentinjection.LatentInjectionResume,latentinjection.LatentJailbreak,encoding.InjectBase64,encoding.InjectHex,encoding.InjectROT13,dan.DanInTheWild,goodside.Tag,phrasing.PastTense"

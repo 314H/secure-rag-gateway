@@ -1,0 +1,11 @@
+# Regras padrão do gitleaks + exceções para os dados de teste intencionais (todos fictícios).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "documentos sintéticos e chaves de demonstração usados para testar o próprio gateway"
+paths = [
+  '''data/docs/runbook_legado_ti\.md''',
+  '''config/principals\.yaml''',
+  '''security-tests/promptfoo/promptfooconfig\.yaml''',
+]
