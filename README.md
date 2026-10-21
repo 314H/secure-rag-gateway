@@ -112,7 +112,38 @@ indirect prompt injection with a markdown exfiltration payload, and a runbook co
 | promptfoo regression (20 cases) | OWASP LLM01/02/04/06/08/09/10 attacks against the running gateway plus utility checks that guardrails do not block legitimate questions | [security-tests/promptfoo](security-tests/promptfoo/promptfooconfig.yaml) |
 | garak scan (11 probes) | direct and latent prompt injection, encoding and unicode-tag smuggling, DAN, harmful requests in past tense; fails if the attack success rate (ASR) of any probe exceeds 10 % | [security-tests/garak](security-tests/garak) |
 
-RESULTS_PLACEHOLDER
+### Results (2026-10-21, CPU, qwen2.5 0.5B + Llama Guard 3 1B + EmbeddingGemma)
+
+**promptfoo:** 20/20 passing, locally and in CI.
+
+**garak**, same 11 probes (10 prompts each, 1 generation) against the model called directly through LiteLLM
+with a system prompt, and against the gateway:
+
+| Probe | ASR, model direct | ASR, through gateway |
+| --- | --- | --- |
+| promptinject.HijackHateHumans | 80% | 0% |
+| promptinject.HijackKillHumans | 40% | 0% |
+| latentinjection.LatentJailbreak | 50% | 0% |
+| latentinjection.LatentInjectionReport | 20% | 0% |
+| latentinjection.LatentInjectionResume | 20% | 0% |
+| encoding.InjectBase64 / InjectHex / InjectROT13 | 0% | 0% |
+| goodside.Tag (unicode tag smuggling) | 0% | 0% |
+| **Mean** | **23.3%** | **0%** |
+
+How to read this honestly:
+
+- **No garak prompt reached the LLM through the gateway.** Of 132 requests, 15% were stopped by the injection
+  heuristics, 30% by Llama Guard and 55% had no authorized context (the assistant is grounded-only, so it does
+  not call the model without a relevant document the user may read). The 0% measures the input defenses plus
+  that deny-by-default design, not the model's own robustness.
+- Attacks that do reach the model together with retrieved documents (indirect injection, markdown exfiltration,
+  hidden-context extraction) are covered by the promptfoo suite.
+- The encoding probes score 0% on the direct model too: a 0.5B model cannot decode base64 or hex, so these
+  probes only become meaningful with a larger model.
+- `dan.DanInTheWild` and `phrasing.PastTense` are scored by garak only with English refusal-keyword detectors
+  (`mitigation.MitigationBypass`, `mitigation.Prefixes`). The gateway refuses in Portuguese, so those detectors
+  report false positives; they are shown as informational in the CI summary and not used for the gate. Both
+  attack classes are asserted in Portuguese-aware form in the promptfoo suite.
 
 ## Observability
 
