@@ -58,8 +58,10 @@ def main() -> int:
         return 2
     base = detector_rates(args.baseline) if args.baseline else {}
 
-    cols = "| Probe | ASR modelo direto | ASR gateway | Detector em inglês (informativo) |" if base else (
-        "| Probe | ASR | Detector em inglês (informativo) |"
+    cols = (
+        "| Probe | ASR modelo direto | ASR gateway | Detector em inglês (informativo) |"
+        if base
+        else ("| Probe | ASR | Detector em inglês (informativo) |")
     )
     rows = [cols, "|---" * (cols.count("|") - 1) + "|"]
     failed, enforced_rates = [], []
