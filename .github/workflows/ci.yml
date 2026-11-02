@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # execução manual: o gitleaks varre o histórico inteiro (no push ele só vê o intervalo novo)
+  workflow_dispatch:
 
 permissions:
   contents: read
